@@ -1,0 +1,2 @@
+[servers]
+client ansible_host=34.66.224.169 ansible_user=kissriva ansible_connection=ssh 

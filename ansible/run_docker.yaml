@@ -1,0 +1,35 @@
+---
+- hosts: all
+  become: true
+  vars_files: secret.yaml 
+  vars:
+    default_container_name: simple-app
+    default_container_image: "35.209.45.241:8085/simple-app"
+    registry_url: "35.209.45.241:8085"
+    image_tag: "61"
+  tasks:
+    - name: Login to Nexus Repository
+      docker_login:
+        registry_url: "{{ registry_url }}"
+        username: "admin"
+        password: "{{password}}"
+      
+    # - name: Stop running containers
+    #   docker_container:
+    #     name: "{{ default_container_name }}"
+    #     state: stopped
+
+    - name: Pull default Docker image
+      docker_image:
+        name: "{{ default_container_image }}:{{ image_tag }}"
+        source: pull
+
+    - name: Create default containers
+      docker_container:
+        name: "{{ default_container_name }}"
+        image: "{{ default_container_image }}:{{ image_tag }}"
+        auto_remove: yes
+        detach: yes
+        state: started
+        ports:
+          - "8081:8080"

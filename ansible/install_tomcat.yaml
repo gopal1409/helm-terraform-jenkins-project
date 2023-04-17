@@ -1,0 +1,97 @@
+--- 
+- name: Install and Configure Tomat 
+  hosts: all
+  become: yes
+  gather_facts: false
+  vars:
+    tomcat_archive_tar: "https://dlcdn.apache.org/tomcat/tomcat-10/v10.0.27/bin/apache-tomcat-10.0.27.tar.gz"
+    tomcat_archive: "apache-tomcat-10.0.27.tar.gz"
+    tomcat_service_src: "files/tomcat.service"
+    tomcat_service_dest: "/etc/systemd/system/tomcat.service"
+
+  tasks:
+    - name: Create group for tomcat
+      group:
+        name: tomcat
+        state: present
+
+    - name: Create new user
+      user:
+        name: tomcat
+        create_home: yes 
+        group: tomcat
+        home: /opt/tomcat
+        shell: /bin/false
+       
+    - name: Update the package manager
+      apt:
+        update_cache: yes 
+
+    - name: Install the JDK
+      apt:
+        name: default-jdk
+        state: present 
+
+    - name: Check the java version
+      shell: java -version
+      register: java_version
+      notify: java
+
+    - name: Download the tomcat archive
+      get_url:
+        url: "{{ tomcat_archive_tar }}"
+        dest: /tmp
+
+    - name: Extract the tomcat archive
+      unarchive:
+        src: "/tmp/{{ tomcat_archive }}"
+        dest: "/opt/tomcat"
+        extra_opts: [--strip-components=1]
+        remote_src: true
+      
+    - name: Change ownership of tomcat directory
+      file:
+        path: /opt/tomcat
+        owner: tomcat
+        group: tomcat
+        mode: "u+x"
+        recurse: yes
+        state: directory
+        
+    - name: Create a Tomcat service file 
+      file: 
+        path: "{{ tomcat_service_dest }}"
+        state: touch
+
+    - name: Copy the tomcat.service file 
+      copy: 
+        src: "{{ tomcat_service_src }}"
+        dest: "{{ tomcat_service_dest }}"
+
+    - name: Reload and Start the Tomcat service
+      systemd:
+        daemon_reload: true
+        name: tomcat 
+        state: started
+        enabled: true 
+
+    - name: Check the status of Tomcat service
+      shell: systemctl status tomcat
+      register: tomcat
+      notify: tomcat-service
+
+    - name: Allow port 8080
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+
+
+  handlers:
+    - name: java 
+      debug:
+        var: java_version.stderr
+
+    - name: tomcat-service
+      debug:
+        var: tomcat.stdout_lines
